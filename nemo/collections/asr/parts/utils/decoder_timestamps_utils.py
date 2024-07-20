@@ -641,7 +641,7 @@ class ASRDecoderTimeStamps:
         torch.set_grad_enabled(False)
         words_dict, word_ts_dict = {}, {}
 
-        werbpe_ts = WER_TS(
+        wer_ts = WER_TS(
             vocabulary=asr_model.decoder.vocabulary,
             batch_dim_index=0,
             use_cer=asr_model._cfg.get('use_cer', False),
