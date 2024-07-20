@@ -650,47 +650,43 @@ class ASRDecoderTimeStamps:
             log_prediction=asr_model._cfg.get("log_prediction", False),
         )
 
-        frame_asr = FrameBatchASRLogits(
-            asr_model=asr_model,
-            frame_len=self.chunk_len_in_sec,
-            total_buffer=self.total_buffer_in_secs,
-            batch_size=self.asr_batch_size,
-        )
+        # frame_asr = FrameBatchASRLogits(
+        #     asr_model=asr_model,
+        #     frame_len=self.chunk_len_in_sec,
+        #     total_buffer=self.total_buffer_in_secs,
+        #     batch_size=self.asr_batch_size,
+        # )
 
         onset_delay, mid_delay, tokens_per_chunk = self.set_buffered_infer_params(asr_model)
         onset_delay_in_sec = round(onset_delay * self.model_stride_in_secs, 2)
 
         with torch.cuda.amp.autocast():
-            logging.info(f"Running ASR model {self.ASR_model_name}")
-
-            for idx, audio_file_path in enumerate(self.audio_file_list):
-                uniq_id = get_uniqname_from_filepath(audio_file_path)
-                logging.info(f"[{idx+1}/{len(self.audio_file_list)}] FrameBatchASR: {audio_file_path}")
-                frame_asr.clear_buffer()
-
-                hyp, greedy_predictions_list, log_prob = get_wer_feat_logit(
-                    audio_file_path,
-                    frame_asr,
-                    self.chunk_len_in_sec,
-                    tokens_per_chunk,
-                    mid_delay,
-                    self.model_stride_in_secs,
-                )
+            transcript_hyps_list = asr_model.transcribe(
+                self.audio_file_list, batch_size=self.asr_batch_size, return_hypotheses=True
+            )  # type: List[nemo_asr.parts.Hypothesis]
+            transcript_logits_list = [hyp.alignments for hyp in transcript_hyps_list]
+            for idx, logit_np in enumerate(transcript_logits_list):
+                logit_np = logit_np.cpu().numpy()
+                uniq_id = get_uniqname_from_filepath(self.audio_file_list[idx])
                 if self.beam_search_decoder:
                     logging.info(
-                        f"Running beam-search decoder with LM {self.ctc_decoder_params['pretrained_language_model']}"
+                        f"Running beam-search decoder on {uniq_id} with LM {self.ctc_decoder_params['pretrained_language_model']}"
                     )
-                    log_prob = log_prob.unsqueeze(0).cpu().numpy()[0]
-                    hyp_words, word_ts = self.run_pyctcdecode(log_prob, onset_delay_in_sec=onset_delay_in_sec)
+                    hyp_words, word_ts = self.run_pyctcdecode(logit_np)
                 else:
-                    logits_len = torch.from_numpy(np.array([len(greedy_predictions_list)]))
-                    greedy_predictions_list = greedy_predictions_list[onset_delay:]
-                    greedy_predictions = torch.from_numpy(np.array(greedy_predictions_list)).unsqueeze(0)
-                    text, char_ts, word_ts = werbpe_ts.ctc_decoder_predictions_tensor_with_ts(
-                        self.model_stride_in_secs, greedy_predictions, predictions_len=logits_len
+                    log_prob = torch.from_numpy(logit_np)
+                    logits_len = torch.from_numpy(np.array([log_prob.shape[0]]))
+                    greedy_predictions = log_prob.argmax(dim=-1, keepdim=False).unsqueeze(0)
+                    text, char_ts = wer_ts.ctc_decoder_predictions_tensor_with_ts(
+                        greedy_predictions, predictions_len=logits_len
                     )
-                    hyp_words, word_ts = text[0].split(), word_ts[0]
-
+                    trans, char_ts_in_feature_frame_idx = self.clean_trans_and_TS(text[0], char_ts[0])
+                    spaces_in_sec, hyp_words = self._get_spaces(
+                        trans, char_ts_in_feature_frame_idx, self.model_stride_in_secs
+                    )
+                    word_ts = self.get_word_ts_from_spaces(
+                        char_ts_in_feature_frame_idx, spaces_in_sec, end_stamp=logit_np.shape[0]
+                    )
                 word_ts = self.align_decoder_delay(word_ts, self.decoder_delay_in_sec)
                 assert len(hyp_words) == len(word_ts), "Words and word timestamp list length does not match."
                 words_dict[uniq_id] = hyp_words
