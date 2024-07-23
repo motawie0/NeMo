@@ -755,7 +755,7 @@ class ASRDecoderTimeStamps:
                 List containing the word timestamps from the decoder.
         """
         beams = self.beam_search_decoder.decode_beams(logprob, beam_width=self.ctc_decoder_params['beam_width'])
-        print("motawieeee: ", beams[0][2])
+        print("sus: ", beams[0][2])
         # print("motawieeee: ", beams[0])
         # print("motawieeee: ", beams[0][2])
         word_ts_beam, words_beam = [], []
