@@ -759,8 +759,8 @@ class ASRDecoderTimeStamps:
         print("motawieeee: ", beams[0])
         print("motawieeee: ", beams[0][2])
         word_ts_beam, words_beam = [], []
-        for idx, (word, _) in enumerate(beams[0][2]):
-            ts = self.get_word_ts_from_wordframes(idx, beams[0][2], self.model_stride_in_secs, onset_delay_in_sec)
+        for idx, (word, _) in enumerate(beams):
+            ts = self.get_word_ts_from_wordframes(idx, beams, self.model_stride_in_secs, onset_delay_in_sec)
             word_ts_beam.append(ts)
             words_beam.append(word)
         hyp_words, word_ts = words_beam, word_ts_beam
