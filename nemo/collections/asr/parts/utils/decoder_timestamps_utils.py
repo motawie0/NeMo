@@ -405,6 +405,7 @@ class ASRDecoderTimeStamps:
             labels[0] = "<unk>"
         elif 'EncDecCTCModel' in str(type(asr_model)):
             labels = asr_model.decoder.vocabulary
+            print("motawie: ", labels)
         else:
             raise ValueError(f"Cannot find a vocabulary or tokenizer for: {self.params['self.ASR_model_name']}")
 
