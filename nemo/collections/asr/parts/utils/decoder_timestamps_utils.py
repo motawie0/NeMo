@@ -759,8 +759,8 @@ class ASRDecoderTimeStamps:
         beams = self.beam_search_decoder.decode_beams(logprob, beam_width=self.ctc_decoder_params['beam_width'])
         print('sus3333:', beams[0])
         word_ts_beam, words_beam = [], []
-        for idx, (word, _) in enumerate(beams[0]):
-            ts = self.get_word_ts_from_wordframes(idx, beams[0][2], self.model_stride_in_secs, onset_delay_in_sec)
+        for idx, (word, timeframe) in enumerate(beams[0].text_frames):
+            ts = self.get_word_ts_from_wordframes(idx, beams[0].text_frames, self.model_stride_in_secs, onset_delay_in_sec)
             word_ts_beam.append(ts)
             words_beam.append(word)
         hyp_words, word_ts = words_beam, word_ts_beam
